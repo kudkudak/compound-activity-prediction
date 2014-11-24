@@ -15,18 +15,12 @@ import pandas as pd
 from scipy import sparse
 import theanets
 import matplotlib
+
 matplotlib.use('Qt4Agg')
 
 
 # This will be used when used cache_ram=True
 mem_storage = {}
-
-import calendar
-import datetime
-
-def electric_date_to_timestamp(date):
-    return calendar.timegm(datetime.datetime.strptime(date,"%Y-%m-%d").utctimetuple())
-
 
 
 def timed(func):
@@ -36,7 +30,8 @@ def timed(func):
         tstart = time.time()
         result = func(*args, **dict_args)
         tend = time.time()
-        print("{0} ({1}, {2}) took {3:2.4f} s to execute".format(func.__name__, len(args), len(dict_args), tend - tstart))
+        print(
+        "{0} ({1}, {2}) took {3:2.4f} s to execute".format(func.__name__, len(args), len(dict_args), tend - tstart))
         return result
 
     return timed
@@ -82,7 +77,7 @@ def theanets_save(key, val):
     with open(file_name_network_structure, "w") as f:
         pickle.dump({"layers": val.network.layers, "hidden_activation": val.network.hidden_activation,
                      "output_activation": val.network.output_activation
-                     }, f)
+                    }, f)
     val.network.save(file_name_network)
 
 
@@ -90,18 +85,21 @@ from sklearn.externals import joblib
 
 import os
 
+
 def scikit_load(key):
     dir = os.path.join(c["CACHE_DIR"], key)
-    file_name = os.path.join(os.path.join(c["CACHE_DIR"],dir), key + ".pkl")
+    file_name = os.path.join(os.path.join(c["CACHE_DIR"], dir), key + ".pkl")
     return joblib.load(file_name)
+
 
 def scikit_check(key):
     dir = os.path.join(c["CACHE_DIR"], key)
-    return len(glob.glob(os.path.join(os.path.join(c["CACHE_DIR"],dir), key + ".pkl*"))) > 0
+    return len(glob.glob(os.path.join(os.path.join(c["CACHE_DIR"], dir), key + ".pkl*"))) > 0
+
 
 def scikit_save(key, val):
     dir = os.path.join(c["CACHE_DIR"], key)
-    os.system("mkdir "+dir)
+    os.system("mkdir " + dir)
     file_name = os.path.join(dir, key + ".pkl")
     joblib.dump(val, file_name)
 
@@ -188,16 +186,15 @@ def generate_key(func_name, args, dict_args_original, skip_args):
             if hasattr(v, '__call__')
             else
             (str(v) if len(str(v)) < 200 else hashlib.md5(str(v)).hexdigest())
-            for v in args_concat if hasattr(v, '__call__') or hasattr(v,"__init__") or str(v).find("0x") == -1]))
-
-
+            for v in args_concat if hasattr(v, '__call__') or hasattr(v, "__init__") or str(v).find("0x") == -1]))
 
     logger.info("Serialized args to " + args_serialized)
 
     key = func_name + "_" + ''.join((a for a in args_serialized if a.isalnum() or a in "!@#$%^&**_+-"))
 
-    full_key = func_name + "(" + "".join([str(k)+"="+(str(v) if len(str(v))<200 else hashlib.md5(str(v)).hexdigest())
-                                          for k,v in sorted(dict_args_original.iteritems()) if key not in skip_args])
+    full_key = func_name + "(" + "".join(
+        [str(k) + "=" + (str(v) if len(str(v)) < 200 else hashlib.md5(str(v)).hexdigest())
+         for k, v in sorted(dict_args_original.iteritems()) if key not in skip_args])
 
     if len(key) > 400:
         key = key[0:400]
@@ -233,12 +230,11 @@ def cached_FS(save_fnc=None, load_fnc=None, check_fnc=None, skip_args=None, cach
 
             # For retrievel
             if not os.path.exists(os.path.join(c["CACHE_DIR"], "cache_dict.txt")):
-                with open(os.path.join(c["CACHE_DIR"], "cache_dict.txt"),"w") as f:
+                with open(os.path.join(c["CACHE_DIR"], "cache_dict.txt"), "w") as f:
                     f.write("File containing hashes explanation for refernce\n ==== \n")
 
-            with open(os.path.join(c["CACHE_DIR"], "cache_dict.txt"),"a") as f:
-                f.write(key + "\n" + fullkey +"\n")
-
+            with open(os.path.join(c["CACHE_DIR"], "cache_dict.txt"), "a") as f:
+                f.write(key + "\n" + fullkey + "\n")
 
             if cache_ram and key in mem_storage:
                 print("Reading from cache ram")
