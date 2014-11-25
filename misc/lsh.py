@@ -1,5 +1,5 @@
 """
-Code is copied from Florian Leitner Text Mining course
+Code is based on Florian Leitner Text Mining course
 
 http://nbviewer.ipython.org/github/fnl/asdm-tm-class/blob/master/Locality%20Sensitive%20Hashing.ipynb
 
@@ -12,9 +12,47 @@ Thanks!
 
 
 from collections import defaultdict
+import numpy as np
+import math
+
+def pick_bands(threshold, hashes):
+    target = hashes * -1 * math.log(threshold)
+    bands = 1
+    while bands * math.log(bands) < target:
+        bands += 1
+    return bands
+
+def pick_hashes_and_bands(threshold, max_hashes):
+    bands = pick_bands(threshold, max_hashes)
+    hashes = (max_hashes / bands) * bands
+    return (hashes, bands)
+
+def pick_hashes_and_bands2(threshold, max_hashes):
+    best_err = 1e6
+    best_b = -1
+    target = 0.5
+    for b in range(1, max_hashes):
+        r = max_hashes/b
+        p_at_tr = 1. - (1. - threshold**r)**b
+        if abs(p_at_tr - target) < best_err:
+            best_err = abs(p_at_tr - target)
+            best_b = b
+    return (max_hashes/best_b)*best_b, best_b
 
 
-class MinHashSignature:
+class WrapHashRow(object):
+    def __init__(self, b):
+        self.b = b
+        self.hb = hash(str(self.b[0:min(20, len(self.b))]))
+
+    def __hash__(self):
+        return self.hb
+
+    def __iter__(self):
+        return iter(self.b)
+
+# Jak to przyspieszyc?
+class SparseMinHashSignature:
     """Hash signatures for sets/tuples using minhash."""
 
     def __init__(self, dim):
@@ -23,22 +61,16 @@ class MinHashSignature:
         (number of hash functions).
         """
         self.dim = dim
-        self.hashes = self.hash_functions()
+        self.a = np.random.randint(low=3000, high=1e9, size=(dim,2))
+        self.p = 805306457
 
-    def hash_functions(self):
-        """Return dim different hash functions."""
-        def hash_factory(n):
-            return lambda x: hash("salt" + str(n) + str(x) + "salt")
-
-        return [ hash_factory(_) for _ in range(self.dim) ]
 
     def sign(self, item):
         """Return the minhash signatures for the `item`."""
         sig = [ float("inf") ] * self.dim
-
-        for hash_ix, hash_fn in enumerate(self.hashes):
+        for i in xrange(self.a.shape[0]):
             # minhashing; requires item is iterable:
-            sig[hash_ix] = min(hash_fn(i) for i in item)
+            sig[i] = ((self.a[i,0]*item + self.a[i,1])%self.p).min()
 
         return sig
 
@@ -50,43 +82,16 @@ class LSH:
     similar signatures to the same buckets.
     """
 
-    def __init__(self, size, threshold):
+    def __init__(self, size, bands, threshold):
         """
         LSH approximating a given similarity `threshold`
         with a given hash signature `size`.
         """
         self.size = size
         self.threshold = threshold
-        self.bandwidth = self.get_bandwidth(size, threshold)
+        self.bands = bands
+        self.bandwidth = self.size/self.bands
 
-    @staticmethod
-    def get_bandwidth(n, t):
-        """
-        Approximate the bandwidth (number of rows in each band)
-        needed to get threshold.
-
-        Threshold t = (1/b) ** (1/r)
-        where
-        b = # of bands
-        r = # of rows per band
-        n = b * r = size of signature
-        """
-        best = n # 1
-        minerr = float("inf")
-
-        for r in range(1, n + 1):
-            try:
-                b = 1. / (t ** r)
-            except: # Divide by zero, your signature is huge
-                return best
-
-            err = abs(n - b * r)
-
-            if err < minerr:
-                best = r
-                minerr = err
-
-        return best
 
     def hash(self, sig):
         """Generate hash values for this signature."""
@@ -188,15 +193,17 @@ class Cluster:
     3. Use UnionFind to merge buckets containing same values
     """
 
-    def __init__(self, threshold=0.5, size=10):
+    def __init__(self, threshold=0.5, max_hashes=50,  MinHasher=SparseMinHashSignature):
         """
         The `size` parameter controls the number of hash
         functions ("signature size") to create.
         """
-        self.size = size
+        self.hashes, self.bands = pick_hashes_and_bands2(threshold, max_hashes)
+        print "Picked "+str(self.hashes)+ " and bands=" + str(self.bands)
+
         self.unions = UnionFind()
-        self.signer = MinHashSignature(size)
-        self.hasher = LSH(size, threshold)
+        self.signer = MinHasher(self.hashes)
+        self.hasher = LSH(self.hashes, self.bands, threshold)
         self.hashmaps = [
             defaultdict(list) for _ in range(self.hasher.get_n_bands())
         ]
@@ -216,7 +223,7 @@ class Cluster:
         self.unions[label]
 
         # Get item signature
-        sig = self.signer.sign(item)
+        sig = self.signer.sign(item.b)
 
         # Unite labels with the same LSH keys in the same band
         for band_idx, hashval in enumerate(self.hasher.hash(sig)):
@@ -238,7 +245,7 @@ class Cluster:
         Returns a (possibly empty) set of labels.
         """
         # Get signature
-        sig = self.signer.sign(item)
+        sig = self.signer.sign(item.b)
 
         matches = set()
 
