@@ -12,7 +12,7 @@ from misc.lsh import *
 import scipy
 import itertools
 from sklearn.cross_validation import StratifiedKFold
-from sklearn.metrics import jaccard_similarity_score
+from sklearn.metrics import jaccard_similarity_score, confusion_matrix
 import itertools
 
 
@@ -24,6 +24,11 @@ proteins = ['5ht7','5ht6','SERT','5ht2c','5ht2a','hiv_integrase','h1','hERG','ca
 # Small test for loaded data
 prot_counts = [len(glob.glob(os.path.join(c["DATA_DIR"], "*"+w+".libsvm"))) for w in fingerprints]
 assert(all([i==12 for i in prot_counts]))
+
+def wac_score(Y_true, Y_pred):
+    cm = confusion_matrix(Y_true, Y_pred)
+    tp, fn, fp, tn = cm[1,1], cm[1,0], cm[0,1], cm[0,0]
+    return 0.5*tp/float(tp+fn) + 0.5*tn/float(tn+fp)
 
 def jaccard_similarity_score_fast(r1, r2):
     dt = float(r1.dot(r2.T).sum())
@@ -93,17 +98,22 @@ def set_representation_by_buckets(X):
 
 
 @cached_FS()
-def construct_LSH_index(X_bucketed, threshold=0.56, max_hashes=200):
+def construct_LSH_index(protein=0, fingerprint=4, threshold=0.56, max_hashes=200):
     """
     Constructs LSH index
     """
     # Prepare objects
+
+    X, Y = load_svmlight_file(os.path.join(c["DATA_DIR"], proteins[protein]+"_"+fingerprints[fingerprint]+".libsvm"))
+    X = set_representation_by_buckets(X)
+
+
     C = Cluster(threshold=threshold, max_hashes=max_hashes)
-    _, b = X_bucketed.nonzero()
-    indptr = X_bucketed.indptr
+    _, b = X.nonzero()
+    indptr = X.indptr
 
     # Construct index
-    for ex in range(X_bucketed.shape[0]):
+    for ex in range(X.shape[0]):
         C.add(b[indptr[ex]:indptr[ex+1]], label=ex)
 
     return C
@@ -111,7 +121,7 @@ def construct_LSH_index(X_bucketed, threshold=0.56, max_hashes=200):
 
 @timed
 @cached_FS()
-def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10, max_hashes=300, seed=0):
+def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10, max_hashes=300, seed=0, limit=None):
     """
     Prepares experiment data embedded using jaccard similarity
     """
@@ -126,7 +136,7 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
     lsh_thresholds= [0.3,0.4,0.45, 0.5, 0.55, 0.6, 0.65,0.7,0.75, 0.8,0.9]
 
     print "Constructing lsh_indexes"
-    lsh_indexes = [construct_LSH_index(X_bucketed=X, threshold=t, max_hashes=max_hashes) for t \
+    lsh_indexes = [construct_LSH_index(protein=protein, fingerprint=fingerprint, threshold=t, max_hashes=max_hashes) for t \
                    in lsh_thresholds]
 
 
@@ -153,7 +163,13 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
         @timed
         def construct_embedding(source, target):
             # Construct train data
-            for row_idx in source:
+
+            itr = source
+
+            if limit != None:
+                itr = itertools.islice(source, limit)
+
+            for row_idx in itr:
                 # Query LSHs
                 candidates = [list(index.match(X[row_idx].nonzero()[1], label=row_idx)) for index in lsh_indexes]
 
@@ -198,7 +214,9 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
                                candidates_neg_dists.max() if len(candidates_neg_dists) else 0.0, \
                                candidates_neg_dists.min() if len(candidates_neg_dists) else 0.0] )
 
+
         construct_embedding(list(tr_id), X_train_lsh)
+        print "Calculating ",protein, fingerprint
         construct_embedding(list(ts_id), X_test_lsh)
 
         folds.append({"X_train": np.array(X_train_lsh), "X_test":np.array(X_test_lsh), "Y_train":Y_train, "Y_test":Y_test})
@@ -242,4 +260,11 @@ Notatki do publikacji
 * Problem z gaussowscia rozkladow, - co jak sa 2 gaussy. Sekwencyjne LSH
 * Dobor thresholda, optymalizacja
 * Statystyki otocznia optymalizowane tak zeby klasy byly rozne
+
+TODO:
+ok; mozna puscic melc tam i zobaczyc co sie stanie
+dwa -> zobaczyc czy jednak nie jest za male K, dac np 20
+trzy -> dodac to PCA (do 95% wariancji np)
+no to mozesz dac 10 i 20 zeby zobaczyc czy nie za duzo/malo
+i te 3 rzeczy powinny dac intuicje co dalej
 """
