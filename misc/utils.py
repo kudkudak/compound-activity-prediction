@@ -243,22 +243,8 @@ def cached_FS(save_fnc=None, load_fnc=None, check_fnc=None, skip_args=None, cach
             logger.info("Checking key " + key)
             cache_file_default = os.path.join(c["CACHE_DIR"], str(key) + ".cache.pkl")
             exists = os.path.exists(cache_file_default) if check_fnc is None else check_fnc(key)
-            if exists and not "force_reload" in dict_args:
-                logger.info("Loading (pickled?) file")
 
-                if load_fnc:
-                    return load_fnc(key)
-                else:
-                    with open(cache_file_default, "r") as f:
-                        if "use_mmap" in dict_args:
-                            g = mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ)
-                            obj = cPickle.load(g) if use_cPickle  else pickle.load(g)
-                            g.close()
-                            return obj
-                        else:
-                            obj = cPickle.load(f) if use_cPickle else pickle.load(f)
-                            return obj
-            else:
+            def evaluate_and_write():
                 logger.info("Cache miss or force reload. Caching " + key)
                 returned_value = func(*args, **dict_args_original)
                 if save_fnc:
@@ -274,6 +260,29 @@ def cached_FS(save_fnc=None, load_fnc=None, check_fnc=None, skip_args=None, cach
                     mem_storage[key] = returned_value
 
                 return returned_value
+
+            if exists and not "force_reload" in dict_args:
+                logger.info("Loading (pickled?) file")
+
+                if load_fnc:
+                    return load_fnc(key)
+                else:
+                    # We do try here because we might have failed writing pickle file before
+                    try:
+                        with open(cache_file_default, "r") as f:
+                            if "use_mmap" in dict_args:
+                                g = mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ)
+                                obj = cPickle.load(g) if use_cPickle  else pickle.load(g)
+                                g.close()
+                                return obj
+                            else:
+                                obj = cPickle.load(f) if use_cPickle else pickle.load(f)
+                                return obj
+                    except:
+                       return evaluate_and_write()
+
+            else:
+               return evaluate_and_write()
 
         return func_caching
 

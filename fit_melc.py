@@ -52,12 +52,11 @@ def fit_melcs(config_in = None):
         results["mean_acc"] = 0
         results["mean_mcc"] = 0
 
-        clf = MELC(base_objective=DCS(), method="CG", random_state=666,
-            n_iters=4, n_jobs=4, verbose=0, on_sphere=True, gamma=config["gamma"])
 
         X, Y = D["X"], D["Y"]
         values["mean_cls"] = Y.mean()
         values["transformers"] = []
+        values["models"] = []
 
         for fold in D["folds"]:
             if config["use_embedding"] == 0:
@@ -75,13 +74,13 @@ def fit_melcs(config_in = None):
 
             values["transformers"].append(min_max_scaler) # Just in case
 
-            if config["kernel"] == "rbf":
-                m = SVC(C=config["C"], gamma=config["gamma"], class_weight="auto")
-            else:
-                m = SVC(C=config["C"], kernel="linear", class_weight="auto")
+            clf = MELC(base_objective=DCS(gamma=config["gamma"]), method="L-BFGS-B", random_state=666,
+                        n_iters=4, n_jobs=4, verbose=0, on_sphere=True)
 
-            m.fit(X_train, Y_train)
-            Y_pred = m.predict(X_test)
+            values["models"].append(clf)
+
+            clf.fit(X_train, Y_train)
+            Y_pred = clf.predict(X_test)
             acc_fold, mcc_fold = accuracy_score(Y_test, Y_pred), matthews_corrcoef(Y_test, Y_pred)
             cm = confusion_matrix(Y_test, Y_pred)
             tp, fn, fp, tn = cm[1,1], cm[1,0], cm[0,1], cm[0,0]
@@ -103,13 +102,11 @@ def fit_melcs(config_in = None):
 
         return E
 
-    if config["use_embedding"] == 1:
-        cv_configs = generate_configs(config, ["C"])
-    else:
-        cv_configs = generate_configs(config, ["C", "gamma"])
+
+    cv_configs = generate_configs(config, ["gamma"])
 
     for c in cv_configs:
-        E["experiments"].append(fit_svm(c))
+        E["experiments"].append(fit_melc(c))
 
     save_exp(E)
 
@@ -121,4 +118,4 @@ def fit_melcs(config_in = None):
     logger.info("Done")
 
 if __name__ == "__main__":
-    fit_svms()
+    fit_melcs()
