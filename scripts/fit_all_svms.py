@@ -1,12 +1,13 @@
 """
 Script to run fitting all the SVM-B RBF
 """
-
-n_jobs = 4
-
+import sys
 import os
 from data_api import fingerprints, proteins
 from fit_svms import fit_svms
+from joblib import Parallel, delayed
+sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+
 
 def exps():
     for id1, p in enumerate(proteins):

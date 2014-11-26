@@ -1,7 +1,7 @@
 from misc.utils import *
 from misc.experiment_utils import get_exp_options, print_exp_header, \
     save_exp, get_exp_logger, generate_configs, print_exp_name
-from data_api import prepare_experiment_data
+from data_api import prepare_experiment_data, prepare_experiment_data_embedded
 from sklearn.metrics import matthews_corrcoef, accuracy_score, confusion_matrix
 from sklearn.svm import SVC
 
@@ -9,13 +9,24 @@ from sklearn.preprocessing import MinMaxScaler
 
 def fit_svms(config_in = None):
     #### Load config and data ####
-    config = {"protein":0, "fingerprint":4,"n_folds":10, "grid_w":10, "kernel":"rbf"}
+    config = {"protein":0, "fingerprint":4,"n_folds":10, "grid_w":10, "kernel":"rbf", \
+              "use_embedding": 0, "K":15, "max_hashes":300, "seed":0}
+
     if config_in is None:
         config.update(get_exp_options(config))
     else:
         config.update(config_in)
 
-    D, config_from_data = prepare_experiment_data(n_folds=10, protein=config["protein"], fingerprint=config["fingerprint"])
+    print_exp_header(config)
+
+    if config["use_embedding"] == 0:
+        D, config_from_data = prepare_experiment_data(n_folds=10, seed=config["seed"], \
+                                                      protein=config["protein"], fingerprint=config["fingerprint"])
+    else:
+        D, config_from_data = prepare_experiment_data_embedded(n_folds=10, seed=config["seed"], K=config["K"], \
+                                                      max_hashes=config["max_hashes"],
+                                                      protein=config["protein"], fingerprint=config["fingerprint"])
+
     config.update(config_from_data)
     config["C"] =[10**i for i in range(-5,6)]
     config["gamma"] = [10**i for i in range(-14,0)]
@@ -49,17 +60,25 @@ def fit_svms(config_in = None):
         values["transformers"] = []
 
         for fold in D["folds"]:
-            tr_id, ts_id = fold["train_id"], fold["test_id"]
+            if config["use_embedding"] == 0:
+                tr_id, ts_id = fold["train_id"], fold["test_id"]
+                X_train, Y_train, X_test, Y_test = X[tr_id], Y[tr_id], X[ts_id], Y[ts_id]
+                min_max_scaler = MinMaxScaler()
+                X_train = min_max_scaler.fit_transform(X_train.todense())
+                X_test = min_max_scaler.transform(X_test.todense())
+            else:
+                X_train, Y_train, X_test, Y_test = fold["X_train"], fold["Y_train"], fold["X_test"], fold["Y_test"]
+                min_max_scaler = MinMaxScaler()
+                X_train = min_max_scaler.fit_transform(X_train)
+                X_test = min_max_scaler.transform(X_test)
 
-            X_train, Y_train, X_test, Y_test = X[tr_id], Y[tr_id], X[ts_id], Y[ts_id]
-
-            min_max_scaler = MinMaxScaler()
-            X_train = min_max_scaler.fit_transform(X_train.todense())
-            X_test = min_max_scaler.transform(X_test.todense())
 
             values["transformers"].append(min_max_scaler) # Just in case
 
-            m = SVC(C=config["C"], gamma=config["gamma"], class_weight="auto")
+            if config["kernel"] == "rbf":
+                m = SVC(C=config["C"], gamma=config["gamma"], class_weight="auto")
+            else:
+                m = SVC(C=config["C"], kernel="linear", class_weight="auto")
 
             m.fit(X_train, Y_train)
             Y_pred = m.predict(X_test)
@@ -84,8 +103,11 @@ def fit_svms(config_in = None):
 
         return E
 
+    if config["use_embedding"] == 1:
+        cv_configs = generate_configs(config, ["C"])
+    else:
+        cv_configs = generate_configs(config, ["C", "gamma"])
 
-    cv_configs = generate_configs(config, ["C", "gamma"])
     for c in cv_configs:
         E["experiments"].append(fit_svm(c))
 

@@ -107,6 +107,8 @@ def construct_LSH_index(X_bucketed, threshold=0.56, max_hashes=200):
         C.add(b[indptr[ex]:indptr[ex+1]], label=ex)
 
     return C
+
+
 @timed
 @cached_FS()
 def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10, max_hashes=300, seed=0):
@@ -118,11 +120,6 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
     X, Y = load_svmlight_file(os.path.join(c["DATA_DIR"], proteins[protein]+"_"+fingerprints[fingerprint]+".libsvm"))
     X = set_representation_by_buckets(X)
 
-    # # Construct LSH index
-    # lsh_threshold, best_err = find_LSH_threshold(protein=protein, fingerprint=fingerprint,\
-    #                                              n_folds=n_folds, K=K, max_hashes=max_hashes, force_reload=True)
-    # print "Picked {0} with mean error {1}".format(lsh_threshold, best_err)
-    # assert(best_err <= 100) # Otherwise there might be something wrong
 
     # Construct sequential lsh indexes labeled by row id. We need those because distance distribution is
     # not well gaussian

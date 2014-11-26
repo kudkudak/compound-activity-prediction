@@ -1,5 +1,8 @@
 from misc.utils import *
 from misc.experiment_utils import *
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__),".."))
 
 ## Load experiments ##
 import sys
