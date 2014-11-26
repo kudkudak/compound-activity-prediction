@@ -1,9 +1,7 @@
 from misc.utils import *
-
 from misc.experiment_utils import get_exp_options, print_exp_header, \
     save_exp, get_exp_logger, generate_configs, print_exp_name
 from data_api import prepare_experiment_data
-
 from sklearn.metrics import matthews_corrcoef, accuracy_score, confusion_matrix
 from sklearn.svm import SVC
 

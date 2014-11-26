@@ -1,4 +1,8 @@
 #TODO: redo experiments with shuffle=true
+#TODO: make unit tests checking how many I have missed as %
+
+
+# Cel - dobrac tak target, aby praktycznie nie wystepowalo mniej niz K kandydatow
 
 from misc.utils import *
 import sklearn
@@ -9,7 +13,7 @@ import scipy
 import itertools
 from sklearn.cross_validation import StratifiedKFold
 from sklearn.metrics import jaccard_similarity_score
-
+import itertools
 
 
 
@@ -21,7 +25,9 @@ proteins = ['5ht7','5ht6','SERT','5ht2c','5ht2a','hiv_integrase','h1','hERG','ca
 prot_counts = [len(glob.glob(os.path.join(c["DATA_DIR"], "*"+w+".libsvm"))) for w in fingerprints]
 assert(all([i==12 for i in prot_counts]))
 
-
+def jaccard_similarity_score_fast(r1, r2):
+    dt = float(r1.dot(r2.T).sum())
+    return dt / (r1.sum() + r2.sum() - dt )
 
 def construct_folds(protein=0, fingerprint=4, n_folds=10, seed=0):
     """
@@ -85,104 +91,142 @@ def set_representation_by_buckets(X):
 
 
 
+
 @cached_FS()
-def get_mean_std_jaccard(protein, fingerprint):
-    """
-    Retrieves mean and std of jaccard distance within given protein-fingerprint sample
-
-    Needed to estimate sensible threshold range (mean +- 1.5 std heuristic)
-    """
-    D, conf = prepare_experiment_data(n_folds=10, protein=protein, fingerprint=fingerprint)
-    X_b = set_representation_by_buckets(D["X"])
-    # Get similarity mean and deviation to get reasonable approximation of threshold
-    h = []
-    for i in range(1000):
-        a,b = np.random.randint(low=0, high=X_b.shape[0], size=(2,))
-        h.append(jaccard_similarity_score(X_b[a].toarray(), X_b[b].toarray()))
-    m, std = np.array(h).mean(), np.array(h).std()
-    return m,std
-
-
-def construct_LSH_index(protein, fingerprint, n_folds=10, seed=0, threshold=0.56, max_hashes=200, set_representation_fnc = set_representation_by_buckets):
+def construct_LSH_index(X_bucketed, threshold=0.56, max_hashes=200):
     """
     Constructs LSH index
     """
-
-    X_bucketed = set_representation_fnc(prepare_experiment_data(protein=protein, fingerprint=fingerprint, n_folds=n_folds, seed=seed)[0]["X"])
-
     # Prepare objects
     C = Cluster(threshold=threshold, max_hashes=max_hashes)
-    class WrapHashRow(object):
-        def __init__(self, b):
-            self.b = b
-            self.hb = hash(str(self.b[0:min(20, len(self.b))]))
-        def __hash__(self):
-            return self.hb
-        def __iter__(self):
-            return iter(self.b)
     _, b = X_bucketed.nonzero()
     indptr = X_bucketed.indptr
 
     # Construct index
     for ex in range(X_bucketed.shape[0]):
-        C.add(WrapHashRow(b[indptr[ex]:indptr[ex+1]]), label=ex)
+        C.add(b[indptr[ex]:indptr[ex+1]], label=ex)
 
     return C
-
-
 @timed
 @cached_FS()
-def find_threshold(protein, fingerprint, K=15, n_folds=10):
-    # Adapting threshold - this way rather than get_mean_std_jaccard as we are not assuming here gauss then
-    f = fingerprint
-    p = protein
+def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10, max_hashes=300, seed=0):
+    """
+    Prepares experiment data embedded using jaccard similarity
+    """
 
-    target = 2*K
-
-    D, conf = prepare_experiment_data(n_folds=n_folds, protein=p, fingerprint=f)
-    X_b = set_representation_by_buckets(D["X"])
-
-    mean, std = get_mean_std_jaccard(protein=p, fingerprint=f)
-
-    best_t = -1
-    best_err = float("inf")
-
-    thresholds = np.linspace(mean-1.5*std, mean+1.5*std, 50)
-    for t in thresholds:
-        print "Learning LSH index for ",t
-        C = construct_LSH_index(protein=p, fingerprint=f, threshold=t, max_hashes=200, \
-                                set_representation_fnc=set_representation_by_buckets)
-        res = []
-        # Sample 100 points
-        for i in range(100):
-            j = np.random.randint(low=0, high=X_b.shape[0])
-            candidates = C.match(WrapHashRow(X_b[j].nonzero()[1]))
-            res.append(len(candidates))
-            #h = [jaccard_similarity_score(X_b[c].toarray(), X_b[j].toarray()) for c in candidates if c != j]
-
-        err = float("inf")
-        if len(candidates) > K:
-            err = abs(len(candidates) - err)
-            if err < best_err:
-                best_t = t
-                best_err = err
-
-        print(np.array(res).mean())
-
-    return best_t, best_err
-
-def jaccard_statistics(X):
+    # Load and transform data to buckets
+    X, Y = load_svmlight_file(os.path.join(c["DATA_DIR"], proteins[protein]+"_"+fingerprints[fingerprint]+".libsvm"))
     X = set_representation_by_buckets(X)
 
-    return X
+    # # Construct LSH index
+    # lsh_threshold, best_err = find_LSH_threshold(protein=protein, fingerprint=fingerprint,\
+    #                                              n_folds=n_folds, K=K, max_hashes=max_hashes, force_reload=True)
+    # print "Picked {0} with mean error {1}".format(lsh_threshold, best_err)
+    # assert(best_err <= 100) # Otherwise there might be something wrong
+
+    # Construct sequential lsh indexes labeled by row id. We need those because distance distribution is
+    # not well gaussian
+    lsh_thresholds= [0.3,0.4,0.45, 0.5, 0.55, 0.6, 0.65,0.7,0.75, 0.8,0.9]
+
+    print "Constructing lsh_indexes"
+    lsh_indexes = [construct_LSH_index(X_bucketed=X, threshold=t, max_hashes=max_hashes) for t \
+                   in lsh_thresholds]
+
+
+    # Prepare folds ids
+    print "Constructing fold indexes"
+    folds_idx = construct_folds(protein=protein, fingerprint=fingerprint, n_folds=n_folds, seed=seed)
+    folds = []
 
 
 
+    statistics_len_split = []
+    statistics_len_candidates = []
+    whole_scans = [0]
+
+    # Constructing folds
+    for fold in folds_idx:
+        tr_id, ts_id = fold["train_id"], fold["test_id"]
+
+        Y_train, Y_test = Y[tr_id],  Y[ts_id]
+        tr_id, ts_id = set(tr_id), set(ts_id) #sets for fast filtering
+
+        X_train_lsh, X_test_lsh = [], [] # We will construct them row by row
+
+        @timed
+        def construct_embedding(source, target):
+            # Construct train data
+            for row_idx in source:
+                # Query LSHs
+                candidates = [list(index.match(X[row_idx].nonzero()[1], label=row_idx)) for index in lsh_indexes]
+
+                # Pick closest
+                best = []
+                best_err = float('inf')
+                for c in candidates:
+                    if len(c) > int(1.3*K) and abs(len(c) - 2*K) < best_err:
+                        best_err = abs(len(c) - 2*K)
+                        best = c
+
+                # Basic filtering (we can look only at training examples)
+                candidates = [c for c in best if c != row_idx and c in tr_id]
+
+                statistics_len_candidates.append(len(candidates))
+
+                candidates_sims = []
+
+                if len(best): # <=> we found a good LSH threshold
+                    # Caching result
+                    candidates_sims = np.array([jaccard_similarity_score_fast(X[row_idx], X[idx]) \
+                                       for idx in candidates])
+                else:
+                    candidates_sims = np.array([jaccard_similarity_score_fast(X[row_idx], X[idx]) \
+                                       for idx in source])
+                    whole_scans[0] += 1
+
+                # Sort and get K closests in relative indexes (for fast query, optimization)
+                candidates_relative = sorted(range(len(candidates))\
+                                             , key=lambda idx: -candidates_sims[idx] )[0:K] # decreasing by default so reverse
+
+                # Get dists
+                candidates_pos_dists = np.array([candidates_sims[idx] for idx in candidates_relative if Y[candidates[idx]]==1])
+                candidates_neg_dists = np.array([candidates_sims[idx] for idx in candidates_relative if Y[candidates[idx]]==-1])
+
+                target.append([len(candidates_pos_dists), \
+                               len(candidates_neg_dists), \
+                               candidates_pos_dists.mean() if len(candidates_pos_dists) else 0.0, \
+                               candidates_pos_dists.min() if len(candidates_pos_dists) else 0.0, \
+                               candidates_pos_dists.max() if len(candidates_pos_dists) else 0.0,\
+                               candidates_neg_dists.mean() if len(candidates_neg_dists) else 0.0, \
+                               candidates_neg_dists.max() if len(candidates_neg_dists) else 0.0, \
+                               candidates_neg_dists.min() if len(candidates_neg_dists) else 0.0] )
+
+        construct_embedding(list(tr_id), X_train_lsh)
+        construct_embedding(list(ts_id), X_test_lsh)
+
+        folds.append({"X_train": np.array(X_train_lsh), "X_test":np.array(X_test_lsh), "Y_train":Y_train, "Y_test":Y_test})
+
+    return {"folds":folds, "folds_idx":folds_idx, "lsh_indexes": lsh_indexes, "X":X, "Y":Y,\
+            "len_candidates":statistics_len_candidates, "len_split": statistics_len_split,\
+            "whole_scans": whole_scans[0]
+            }, {"examples": X.shape[0]}
+
+
+
+
+def eval_LSH_error(D):
+    """
+    Sanity check for data. Doing the same without LSH for few points and checking if we are reasonably close
+    """
+    return 0.0
 
 
 
 @cached_FS()
 def prepare_experiment_data(protein=0, fingerprint=4, n_folds=10, seed=0):
+    """
+    Prepares experiment data for RBF case
+    """
     np.random.seed(seed)
     X, Y = load_svmlight_file(os.path.join(c["DATA_DIR"], \
                                                        proteins[protein]+"_"+fingerprints[fingerprint]+".libsvm"))
@@ -191,3 +235,14 @@ def prepare_experiment_data(protein=0, fingerprint=4, n_folds=10, seed=0):
     D = {"folds": folds, "X":X, "Y":Y}, {"examples":X.shape[0]}
 
     return D
+
+
+
+
+"""
+Notatki do publikacji
+
+* Problem z gaussowscia rozkladow, - co jak sa 2 gaussy. Sekwencyjne LSH
+* Dobor thresholda, optymalizacja
+* Statystyki otocznia optymalizowane tak zeby klasy byly rozne
+"""

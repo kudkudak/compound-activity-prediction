@@ -208,27 +208,30 @@ class Cluster:
             defaultdict(list) for _ in range(self.hasher.get_n_bands())
         ]
 
-    def add(self, item, label=None):
+        self.signature_cache = {}
+
+    def add(self, item, label):
         """
         Add an `item` to the cluster.
 
         Optionally, use a `label` to reference this `item`.
         Otherwise, the `item` itself is used as the label.
         """
-        # Ensure label for this item
-        if label is None:
-            label = item
-
         # Add to unionfind structure
         self.unions[label]
 
         # Get item signature
-        sig = self.signer.sign(item.b)
+        if label not in self.signature_cache:
+            sig = self.signer.sign(item)
+            self.signature_cache[label] = sig
+        else:
+            sig = self.signature_cache[label]
 
         # Unite labels with the same LSH keys in the same band
         for band_idx, hashval in enumerate(self.hasher.hash(sig)):
             self.hashmaps[band_idx][hashval].append(label)
             self.unions.union(label, self.hashmaps[band_idx][hashval][0])
+
 
     def groups(self):
         """
@@ -238,14 +241,23 @@ class Cluster:
         """
         return self.unions.sets()
 
-    def match(self, item):
+    def match(self, item, label):
         """
         Get a set of matching labels for `item`.
 
         Returns a (possibly empty) set of labels.
         """
-        # Get signature
-        sig = self.signer.sign(item.b)
+
+        # Get signature (we cache signatue when given label)
+        if label is None:
+            sig = self.signer.sign(item)
+        else:
+            if label in self.signature_cache:
+                sig = self.signature_cache[label]
+            else:
+                sig = self.signer.sign(item)
+                self.signature_cache[label] = sig
+
 
         matches = set()
 

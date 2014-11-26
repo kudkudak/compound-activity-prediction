@@ -39,5 +39,6 @@ logger = get_logger("tfml_melc")
 c = {
     "CACHE_DIR" : os.path.join(base_dir, "cache"),
     "DATA_DIR":os.path.join(base_dir, "data"),
-    "BASE_DIR":base_dir
+    "BASE_DIR":base_dir,
+    "CURRENT_EXPERIMENT_CONFIG":{"experiment_name":"my_favourite_experiment"}
 }
