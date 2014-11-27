@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 def fit_svms(config_in = None):
     #### Load config and data ####
     config = {"protein":0, "fingerprint":4,"n_folds":10, "grid_w":10, "kernel":"rbf", \
-              "use_embedding": 0, "K":15, "max_hashes":300, "seed":0}
+              "use_embedding": 0, "K":15, "max_hashes":300, "seed":0, "C_min":-5, "C_max":6}
 
     if config_in is None:
         config.update(get_exp_options(config))
@@ -28,7 +28,7 @@ def fit_svms(config_in = None):
                                                       protein=config["protein"], fingerprint=config["fingerprint"])
 
     config.update(config_from_data)
-    config["C"] =[10**i for i in range(-5,6)]
+    config["C"] =[10**i for i in range(config["C_min"],config["C_max"])]
     config["gamma"] = [10**i for i in range(-14,0)]
     logger = get_exp_logger(config)
 

@@ -261,10 +261,13 @@ Notatki do publikacji
 * Dobor thresholda, optymalizacja
 * Statystyki otocznia optymalizowane tak zeby klasy byly rozne
 
+
 TODO:
 ok; mozna puscic melc tam i zobaczyc co sie stanie
 dwa -> zobaczyc czy jednak nie jest za male K, dac np 20
 trzy -> dodac to PCA (do 95% wariancji np)
 no to mozesz dac 10 i 20 zeby zobaczyc czy nie za duzo/malo
 i te 3 rzeczy powinny dac intuicje co dalej
+cztery -> sprawdzic knn
+
 """

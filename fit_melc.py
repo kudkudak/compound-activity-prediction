@@ -74,8 +74,8 @@ def fit_melcs(config_in = None):
 
             values["transformers"].append(min_max_scaler) # Just in case
 
-            clf = MELC(base_objective=DCS(gamma=config["gamma"]), method="L-BFGS-B", random_state=666,
-                        n_iters=4, n_jobs=4, verbose=0, on_sphere=True)
+            clf = MELC(base_objective=DCS(gamma=config["gamma"]), method="L-BFGS-B", random_state=0,
+                        n_iters=10, n_jobs=5, verbose=0, on_sphere=True)
 
             values["models"].append(clf)
 
