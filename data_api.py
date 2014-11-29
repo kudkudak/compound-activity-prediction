@@ -107,21 +107,24 @@ def construct_LSH_index(protein=0, fingerprint=4, threshold=0.56, max_hashes=200
     X, Y = load_svmlight_file(os.path.join(c["DATA_DIR"], proteins[protein]+"_"+fingerprints[fingerprint]+".libsvm"))
     X = set_representation_by_buckets(X)
 
-
     C = Cluster(threshold=threshold, max_hashes=max_hashes)
-    _, b = X.nonzero()
-    indptr = X.indptr
 
     # Construct index
     for ex in range(X.shape[0]):
-        C.add(b[indptr[ex]:indptr[ex+1]], label=ex)
+        C.add(X[ex].nonzero()[1], label=ex) #b[indptr[ex]:indptr[ex+1]]
 
     return C
 
 
+STANDARD = 0
+FIX_SCALING = 1
+
 @timed
-@cached_FS()
-def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10, max_hashes=300, seed=0, limit=None):
+@cached_FS(skip_args=["collect_statistics"])
+def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, \
+                                     n_folds=10, max_hashes=300, seed=0, limit=None,
+                                     representation_version = STANDARD,
+                                     collect_statistics=False, experimental=False, calculate_folds=range(10)):
     """
     Prepares experiment data embedded using jaccard similarity
     """
@@ -133,12 +136,28 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
 
     # Construct sequential lsh indexes labeled by row id. We need those because distance distribution is
     # not well gaussian
-    lsh_thresholds= [0.3,0.4,0.45, 0.5, 0.55, 0.6, 0.65,0.7,0.75, 0.8,0.9]
+    # lsh_thresholds= [0.3,0.4,0.45, 0.5, 0.55, 0.6, 0.65,0.7,0.75, 0.8,0.9]
 
     print "Constructing lsh_indexes"
-    lsh_indexes = [construct_LSH_index(protein=protein, fingerprint=fingerprint, threshold=t, max_hashes=max_hashes) for t \
-                   in lsh_thresholds]
+    #lsh_indexes = [construct_LSH_index(protein=protein, fingerprint=fingerprint, threshold=t, max_hashes=max_hashes\
+    #     ) for t in lsh_thresholds]
+    #
+    # if experimental:
+    #     # Try this
+    lsh_indexes = [construct_LSH_index(protein=protein, fingerprint=fingerprint, threshold=i, max_hashes=max_hashes, force_reload=True) \
+            for i in np.linspace(0.2, 0.9, 14)]
+    #
+    # else:
 
+
+    #lsh_thresholds= [0.3, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,0.7, 0.8, 0.9]
+
+
+    print "Constructing lsh_indexes"
+
+
+    #lsh_indexes = [construct_LSH_index(protein=protein, fingerprint=fingerprint, threshold=t, max_hashes=max_hashes\
+    #     ) for t in lsh_thresholds]
 
     # Prepare folds ids
     print "Constructing fold indexes"
@@ -150,13 +169,21 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
     statistics_len_split = []
     statistics_len_candidates = []
     whole_scans = [0]
+    picked_threshold = [0]
+
+    # Collected if experimental is ON
+    dists_pos_pos = []
+    dists_pos_neg = []
+    dists_neg_pos = []
+    dists_neg_neg = []
 
     # Constructing folds
-    for fold in folds_idx:
+    for fold_id in calculate_folds:
+        fold = folds_idx[fold_id]
         tr_id, ts_id = fold["train_id"], fold["test_id"]
 
         Y_train, Y_test = Y[tr_id],  Y[ts_id]
-        tr_id, ts_id = set(tr_id), set(ts_id) #sets for fast filtering
+        tr_id_set, ts_id_set = set(tr_id), set(ts_id) #sets for fast filtering
 
         X_train_lsh, X_test_lsh = [], [] # We will construct them row by row
 
@@ -176,13 +203,23 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
                 # Pick closest
                 best = []
                 best_err = float('inf')
-                for c in candidates:
-                    if len(c) > int(1.3*K) and abs(len(c) - 2*K) < best_err:
+                best_id = -1
+                for id, c in enumerate(reversed(candidates)):
+                    if len(c) > 2*K and abs(len(c) - 2*K) < best_err:
                         best_err = abs(len(c) - 2*K)
-                        best = c
+                        best = list(c)
+                        best_id=id
+
+                    if len(c) > 2.5*K:
+                        # this is an imporant heuristic - if it is a reasonably big set accept bigger threshold
+                        best = list(c)
+                        best_id=id
+                        break
+
+                picked_threshold.append(best_id)
 
                 # Basic filtering (we can look only at training examples)
-                candidates = [c for c in best if c != row_idx and c in tr_id]
+                candidates = [c for c in best if c != row_idx and c in tr_id_set]
 
                 statistics_len_candidates.append(len(candidates))
 
@@ -194,7 +231,8 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
                                        for idx in candidates])
                 else:
                     candidates_sims = np.array([jaccard_similarity_score_fast(X[row_idx], X[idx]) \
-                                       for idx in source])
+                                       for idx in tr_id])
+                    candidates = tr_id
                     whole_scans[0] += 1
 
                 # Sort and get K closests in relative indexes (for fast query, optimization)
@@ -205,15 +243,33 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
                 candidates_pos_dists = np.array([candidates_sims[idx] for idx in candidates_relative if Y[candidates[idx]]==1])
                 candidates_neg_dists = np.array([candidates_sims[idx] for idx in candidates_relative if Y[candidates[idx]]==-1])
 
-                target.append([len(candidates_pos_dists), \
-                               len(candidates_neg_dists), \
-                               candidates_pos_dists.mean() if len(candidates_pos_dists) else 0.0, \
-                               candidates_pos_dists.min() if len(candidates_pos_dists) else 0.0, \
-                               candidates_pos_dists.max() if len(candidates_pos_dists) else 0.0,\
-                               candidates_neg_dists.mean() if len(candidates_neg_dists) else 0.0, \
-                               candidates_neg_dists.max() if len(candidates_neg_dists) else 0.0, \
-                               candidates_neg_dists.min() if len(candidates_neg_dists) else 0.0] )
+                if collect_statistics:
+                    if Y[row_idx] == 1:
+                        dists_neg_pos.append(candidates_neg_dists)
+                        dists_pos_pos.append(candidates_pos_dists)
 
+                    if Y[row_idx] == -1:
+                        dists_neg_neg.append(candidates_neg_dists)
+                        dists_pos_neg.append(candidates_pos_dists)
+
+                if representation_version == FIX_SCALING:
+                    target.append([len(candidates_pos_dists)/(0.1 + float(len(candidates_relative))), \
+                                   len(candidates_neg_dists)/(0.1 + float(len(candidates_relative))), \
+                                   candidates_pos_dists.mean() if len(candidates_pos_dists) else 0.0, \
+                                   candidates_pos_dists.min() if len(candidates_pos_dists) else 0.0, \
+                                   candidates_pos_dists.max() if len(candidates_pos_dists) else 0.0,\
+                                   candidates_neg_dists.mean() if len(candidates_neg_dists) else 0.0, \
+                                   candidates_neg_dists.max() if len(candidates_neg_dists) else 0.0, \
+                                   candidates_neg_dists.min() if len(candidates_neg_dists) else 0.0] )
+                elif representation_version == STANDARD:
+                     target.append([len(candidates_pos_dists), \
+                                   len(candidates_neg_dists), \
+                                   candidates_pos_dists.mean() if len(candidates_pos_dists) else 0.0, \
+                                   candidates_pos_dists.min() if len(candidates_pos_dists) else 0.0, \
+                                   candidates_pos_dists.max() if len(candidates_pos_dists) else 0.0,\
+                                   candidates_neg_dists.mean() if len(candidates_neg_dists) else 0.0, \
+                                   candidates_neg_dists.max() if len(candidates_neg_dists) else 0.0, \
+                                   candidates_neg_dists.min() if len(candidates_neg_dists) else 0.0] )
 
         construct_embedding(list(tr_id), X_train_lsh)
         print "Calculating ",protein, fingerprint
@@ -221,9 +277,9 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, n_folds=10,
 
         folds.append({"X_train": np.array(X_train_lsh), "X_test":np.array(X_test_lsh), "Y_train":Y_train, "Y_test":Y_test})
 
-    return {"folds":folds, "folds_idx":folds_idx, "lsh_indexes": lsh_indexes, "X":X, "Y":Y,\
+    return {"folds":folds, "folds_idx":folds_idx, \
             "len_candidates":statistics_len_candidates, "len_split": statistics_len_split,\
-            "whole_scans": whole_scans[0]
+            "whole_scans": whole_scans[0], "picked_threshold":picked_threshold,
             }, {"examples": X.shape[0]}
 
 
@@ -234,7 +290,6 @@ def eval_LSH_error(D):
     Sanity check for data. Doing the same without LSH for few points and checking if we are reasonably close
     """
     return 0.0
-
 
 
 @cached_FS()
@@ -250,6 +305,19 @@ def prepare_experiment_data(protein=0, fingerprint=4, n_folds=10, seed=0):
     D = {"folds": folds, "X":X, "Y":Y}, {"examples":X.shape[0]}
 
     return D
+
+@cached_FS()
+def get_raw_training_data(protein=0, fingerprint=4, n_folds=10, seed=0):
+    """
+    Prepares experiment data for RBF case
+    """
+    np.random.seed(seed)
+    X, Y = load_svmlight_file(os.path.join(c["DATA_DIR"], \
+                                                       proteins[protein]+"_"+fingerprints[fingerprint]+".libsvm"))
+
+    folds = construct_folds(protein=protein, fingerprint=fingerprint, n_folds=n_folds, seed=seed)
+
+    return X, Y
 
 
 

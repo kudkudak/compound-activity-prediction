@@ -40,18 +40,6 @@ def pick_hashes_and_bands2(threshold, max_hashes):
     return (max_hashes/best_b)*best_b, best_b
 
 
-class WrapHashRow(object):
-    def __init__(self, b):
-        self.b = b
-        self.hb = hash(str(self.b[0:min(20, len(self.b))]))
-
-    def __hash__(self):
-        return self.hb
-
-    def __iter__(self):
-        return iter(self.b)
-
-# Jak to przyspieszyc?
 class SparseMinHashSignature:
     """Hash signatures for sets/tuples using minhash."""
 
@@ -61,16 +49,16 @@ class SparseMinHashSignature:
         (number of hash functions).
         """
         self.dim = dim
-        self.a = np.random.randint(low=3000, high=1e9, size=(dim,2))
-        self.p = 805306457
+        self.a = np.random.randint(low=1e3, high=1e8, size=(dim,2))
+        self.p = 49157
 
 
     def sign(self, item):
         """Return the minhash signatures for the `item`."""
-        sig = [ float("inf") ] * self.dim
+        sig = [ float("-inf") ] * self.dim
         for i in xrange(self.a.shape[0]):
             # minhashing; requires item is iterable:
-            sig[i] = ((self.a[i,0]*item + self.a[i,1])%self.p).min()
+            sig[i] = int(((self.a[i,0]*item + self.a[i,1]).astype("int64")%self.p).min())
 
         return sig
 
@@ -95,15 +83,8 @@ class LSH:
 
     def hash(self, sig):
         """Generate hash values for this signature."""
-        for band in zip(*(iter(sig),) * self.bandwidth):
+        for band in zip(*(iter(sig),) * self.bandwidth): #it works, trust me
             yield hash("salt" + str(band) + "tlas")
-
-    @property
-    def exact_threshold(self):
-        """The exact threshold defined by the chosen bandwith."""
-        r = self.bandwidth
-        b = self.size / r
-        return (1. / b) ** (1. / r)
 
     def get_n_bands(self):
         """The number of bands."""
@@ -200,6 +181,7 @@ class Cluster:
         """
         self.hashes, self.bands = pick_hashes_and_bands2(threshold, max_hashes)
         print "Picked "+str(self.hashes)+ " and bands=" + str(self.bands)
+        print "Using fnc2"
 
         self.unions = UnionFind()
         self.signer = MinHasher(self.hashes)
@@ -257,7 +239,6 @@ class Cluster:
             else:
                 sig = self.signer.sign(item)
                 self.signature_cache[label] = sig
-
 
         matches = set()
 

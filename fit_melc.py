@@ -1,15 +1,19 @@
 from misc.utils import *
 from misc.experiment_utils import get_exp_options, print_exp_header, \
     save_exp, get_exp_logger, generate_configs, print_exp_name
-from data_api import prepare_experiment_data, prepare_experiment_data_embedded
+from data_api import get_raw_training_data, prepare_experiment_data_embedded
 from sklearn.metrics import matthews_corrcoef, accuracy_score, confusion_matrix
 from gmum.melc import *
 from sklearn.preprocessing import MinMaxScaler
 
 def fit_melcs(config_in = None):
     #### Load config and data ####
-    config = {"protein":0, "fingerprint":4,"n_folds":10,
+    config = {"protein":0, "fingerprint":4,"n_folds":10, "n_iter":10,
               "use_embedding": 0, "K":15, "max_hashes":300, "seed":0}
+
+    config["gamma_min"] = 0.1
+    config["gamma_max"] = 1.5
+    config["gamma_count"] = 15
 
     if config_in is None:
         config.update(get_exp_options(config))
@@ -18,16 +22,15 @@ def fit_melcs(config_in = None):
 
     print_exp_header(config)
 
-    if config["use_embedding"] == 0:
-        D, config_from_data = prepare_experiment_data(n_folds=10, seed=config["seed"], \
+    X,Y = get_raw_training_data(n_folds=10, seed=config["seed"], \
                                                       protein=config["protein"], fingerprint=config["fingerprint"])
-    else:
+    if config["use_embedding"]==1:
         D, config_from_data = prepare_experiment_data_embedded(n_folds=10, seed=config["seed"], K=config["K"], \
                                                       max_hashes=config["max_hashes"],
-                                                      protein=config["protein"], fingerprint=config["fingerprint"])
+                                                      protein=config["protein"], fingerprint=config["fingerprint"], force_reload=True)
 
     config.update(config_from_data)
-    config["gamma"] = np.linspace(0.1, 1.5, 15)
+    config["gamma"] = np.linspace(config["gamma_min"], config["gamma_max"], config["gamma_count"])
     logger = get_exp_logger(config)
 
     ### Prepare experiment ###
@@ -52,8 +55,6 @@ def fit_melcs(config_in = None):
         results["mean_acc"] = 0
         results["mean_mcc"] = 0
 
-
-        X, Y = D["X"], D["Y"]
         values["mean_cls"] = Y.mean()
         values["transformers"] = []
         values["models"] = []
@@ -75,7 +76,7 @@ def fit_melcs(config_in = None):
             values["transformers"].append(min_max_scaler) # Just in case
 
             clf = MELC(base_objective=DCS(gamma=config["gamma"]), method="L-BFGS-B", random_state=0,
-                        n_iters=10, n_jobs=5, verbose=0, on_sphere=True)
+                        n_iters=config["n_iter"], n_jobs=5, verbose=0, on_sphere=True)
 
             values["models"].append(clf)
 

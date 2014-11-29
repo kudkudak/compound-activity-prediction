@@ -8,7 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__),".."))
 from data_api import fingerprints, proteins, prepare_experiment_data_embedded
 
 
-n_jobs = 4
+n_jobs = 10
 
 
 def exps():
@@ -19,7 +19,7 @@ def exps():
 
 def run(e):
     print("Run "+str(e))
-    D, config = prepare_experiment_data_embedded(protein=e[0], fingerprint=e[1], K=15, n_folds=10, seed=0, max_hashes=300, force_reload=True)
+    D, config = prepare_experiment_data_embedded(protein=e[0], fingerprint=e[1], K=20, n_folds=10, seed=0, max_hashes=700)
 
 
 
