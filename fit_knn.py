@@ -3,15 +3,14 @@ from misc.experiment_utils import get_exp_options, print_exp_header, \
     save_exp, get_exp_logger, generate_configs, print_exp_name
 from data_api import prepare_experiment_data, prepare_experiment_data_embedded, get_raw_training_data
 from sklearn.metrics import matthews_corrcoef, accuracy_score, confusion_matrix
-from sklearn.svm import SVC
-from sklearn.kernel_approximation import Nystroem
-from sklearn import datasets, svm, pipeline
+from sklearn.neighbors import KNeighborsClassifier
+
 from sklearn.preprocessing import MinMaxScaler
 
-def fit_svms(config_in = None):
+def fit_knns(config_in = None):
     #### Load config and data ####
-    config = {"protein":0, "fingerprint":4,"n_folds":10, "kernel":"rbf", \
-              "use_embedding": 0, "K":20, "max_hashes":1000, "seed":0, "C_min":-5, "C_max":6, "gamma_min":-14, "gamma_max":0}
+    config = {"protein":0, "fingerprint":4,"n_folds":10,
+              "use_embedding": 0, "K":20, "max_hashes":1000, "seed":0, "K_min":1, "K_max":24}
 
     if config_in is None:
         config.update(get_exp_options(config))
@@ -32,20 +31,13 @@ def fit_svms(config_in = None):
 
 
     config.update(config_from_data)
-
-    if config["kernel"] != "linear":
-        config["C"] =[10**i for i in range(config["C_min"],1+config["C_max"])]
-    else:
-        config["C"] =[10**(i/float(2)) for i in range(2*config["C_min"],2*(1+config["C_max"]))]
-
-
-    config["gamma"] = [10**i for i in range(config["gamma_min"],config["gamma_max"]+1)]
+    config["KNN_K"] =range(config["K_min"], config["K_max"]+1)
     logger = get_exp_logger(config)
 
     ### Prepare experiment ###
     E = {"config": config, "experiments":[]}
 
-    def fit_svm(config):
+    def fit_knn(config):
         ### Prepare result holders ###b
         values = {}
         results = {}
@@ -71,30 +63,20 @@ def fit_svms(config_in = None):
         for fold in D["folds"]:
             if config["use_embedding"] == 0:
                 tr_id, ts_id = fold["train_id"], fold["test_id"]
-                X_train, Y_train, X_test, Y_test = X[tr_id], Y[tr_id], X[ts_id], Y[ts_id]
-                min_max_scaler = MinMaxScaler()
-                X_train = min_max_scaler.fit_transform(X_train.todense())
-                X_test = min_max_scaler.transform(X_test.todense())
+                X_train, Y_train, X_test, Y_test = X[tr_id].todense(), Y[tr_id], X[ts_id].todense(), Y[ts_id]
             else:
                 X_train, Y_train, X_test, Y_test = fold["X_train"], fold["Y_train"], fold["X_test"], fold["Y_test"]
-                min_max_scaler = MinMaxScaler()
-                X_train = min_max_scaler.fit_transform(X_train)
-                X_test = min_max_scaler.transform(X_test)
 
+            if config["use_embedding"] == 0:
+                clf = KNeighborsClassifier(n_neighbors=config["KNN_K"], metric="jaccard")
+                clf.fit(X_train, Y_train)
+                Y_pred = clf.predict(X_test)
+            else: # Looking at the similarity of the closest example and getting K=1 from arbitrary K :)
+                Y_pred = []
+                for x in X_test:
+                    Y_pred.append(1 if x[-4] > x[-2] else -1)
+                Y_pred = np.array(Y_pred)
 
-            values["transformers"].append(min_max_scaler) # Just in case
-
-            if config["kernel"] == "rbf":
-                m = SVC(C=config["C"], gamma=config["gamma"], class_weight="auto")
-            elif config["kernel"] == "linear":
-                m = SVC(C=config["C"], kernel="linear", class_weight="auto")
-            elif config["kernel"] == "rbf-nystroem":
-                feature_map_nystroem = Nystroem(gamma=config["gamma"], random_state=config["seed"])
-                m = pipeline.Pipeline([("feature_map", feature_map_nystroem),
-                                                    ("svm", SVC(kernel="linear", C=config["C"] , class_weight="auto"))])
-
-            m.fit(X_train, Y_train)
-            Y_pred = m.predict(X_test)
             acc_fold, mcc_fold = accuracy_score(Y_test, Y_pred), matthews_corrcoef(Y_test, Y_pred)
             cm = confusion_matrix(Y_test, Y_pred)
             tp, fn, fp, tn = cm[1,1], cm[1,0], cm[0,1], cm[0,0]
@@ -116,13 +98,13 @@ def fit_svms(config_in = None):
 
         return E
 
-    if config["kernel"] == "linear":
-        cv_configs = generate_configs(config, ["C"])
+    if config["use_embedding"] == 0:
+        cv_configs = generate_configs(config, ["KNN_K"])
     else:
-        cv_configs = generate_configs(config, ["C", "gamma"])
+        cv_configs = [config]
 
     for c in cv_configs:
-        E["experiments"].append(fit_svm(c))
+        E["experiments"].append(fit_knn(c))
 
     save_exp(E)
 
@@ -134,4 +116,4 @@ def fit_svms(config_in = None):
     logger.info("Done")
 
 if __name__ == "__main__":
-    fit_svms()
+    fit_knns()

@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__),".."))
 
 from data_api import fingerprints, proteins
-from fit_svms import fit_svms
+from fit_knn import fit_knns
 
 
 n_jobs = 10
@@ -23,14 +23,18 @@ exps_list = list(exps())
 def run(e):
     print("Run "+str(e))
 
-    config = {"protein":e[0], "fingerprint":e[1], "use_embedding":1, "kernel":"linear", \
-              "experiment_name":"svm_linear_{0}_fin_{1}".format(*e)}
+    config = {"protein":e[0], "fingerprint":e[1], "use_embedding":0,
+              "experiment_name":"KNN_{0}_fin_{1}".format(*e)}
 
     if not os.path.exists(config["experiment_name"]+".experiment"):
-        fit_svms(config)
+        fit_knns(config)
 
 
-print(exps_list)
+    config = {"protein":e[0], "fingerprint":e[1], "use_embedding":1, "max_hashes":1000, "K":20,
+              "experiment_name":"KNN_LSH_{0}_fin_{1}".format(*e)}
+
+    if not os.path.exists(config["experiment_name"]+".experiment"):
+        fit_knns(config)
 
 
 from multiprocessing import Pool

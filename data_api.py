@@ -328,6 +328,9 @@ Notatki do publikacji
 * Problem z gaussowscia rozkladow, - co jak sa 2 gaussy. Sekwencyjne LSH
 * Dobor thresholda, optymalizacja
 * Statystyki otocznia optymalizowane tak zeby klasy byly rozne
+* Najwazniejszy jest najblizszy - wazne zeby go dobrze znalezc: uczymy sie na zbiorze testujacym! KNN mocno spada z K.
+Ale nie zawsze! Sa takie ze sie liczy 3 (fingerprint = 0/0 np)
+* Stala liczba przegladnaych kandydatow na zbiorach od 1k do 4k - teoretycznie tak powinno zostac
 
 
 TODO:
