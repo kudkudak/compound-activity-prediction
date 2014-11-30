@@ -22,13 +22,13 @@ def fit_svms(config_in = None):
 
     if config["use_embedding"] == 0:
         D, config_from_data = prepare_experiment_data(n_folds=10, seed=config["seed"], \
-                                                      protein=config["protein"], fingerprint=config["fingerprint"])
+                                                      protein=config["protein"], fingerprint=config["fingerprint"], force_reload=True)
     else:
         D, config_from_data = prepare_experiment_data_embedded(n_folds=10, seed=config["seed"], K=config["K"], \
                                                       max_hashes=config["max_hashes"],
                                                       protein=config["protein"], fingerprint=config["fingerprint"])
 
-    X, Y = get_raw_training_data(protein = config["protein"], fingerprint=config["fingerprint"])
+    X, Y = get_raw_training_data(protein = config["protein"], fingerprint=config["fingerprint"], force_reload=True)
 
 
     config.update(config_from_data)
@@ -59,6 +59,8 @@ def fit_svms(config_in = None):
         monitors["acc_fold"] = []
         monitors["mcc_fold"] = []
         monitors["wac_fold"] = []
+	monitors["n_support"] = []
+	monitors["train_time"] = []
         monitors["cm"] = [] # confusion matrix
 
         results["mean_acc"] = 0
@@ -67,6 +69,7 @@ def fit_svms(config_in = None):
 
         values["mean_cls"] = Y.mean()
         values["transformers"] = []
+
 
         for fold in D["folds"]:
             if config["use_embedding"] == 0:
@@ -86,14 +89,20 @@ def fit_svms(config_in = None):
 
             if config["kernel"] == "rbf":
                 m = SVC(C=config["C"], gamma=config["gamma"], class_weight="auto")
+		clf = m
             elif config["kernel"] == "linear":
                 m = SVC(C=config["C"], kernel="linear", class_weight="auto")
+		clf = m
             elif config["kernel"] == "rbf-nystroem":
                 feature_map_nystroem = Nystroem(gamma=config["gamma"], random_state=config["seed"])
+		clf = SVC(kernel="linear", C=config["C"] , class_weight="auto")
                 m = pipeline.Pipeline([("feature_map", feature_map_nystroem),
-                                                    ("svm", SVC(kernel="linear", C=config["C"] , class_weight="auto"))])
-
+                                                    ("svm", clf)])
+	    tstart = time.time()
             m.fit(X_train, Y_train)
+	    monitors["train_time"].append(time.time() - tstart)
+	    monitors["n_support"].append(clf.n_support_)
+
             Y_pred = m.predict(X_test)
             acc_fold, mcc_fold = accuracy_score(Y_test, Y_pred), matthews_corrcoef(Y_test, Y_pred)
             cm = confusion_matrix(Y_test, Y_pred)

@@ -320,7 +320,17 @@ def get_raw_training_data(protein=0, fingerprint=4, n_folds=10, seed=0):
     return X, Y
 
 
-
+@timed
+@cached_FS()
+def compute_jaccard_kernel(protein, fingerprint, seed):
+    D, _ = prepare_experiment_data(protein=protein, fingerprint=fingerprint, n_folds=10, seed=seed)
+    X = D["X"]
+    X = set_representation_by_buckets(X)
+    K = np.zeros(shape=(X.shape[0], X.shape[0]))
+    for i in range(K.shape[0]):
+        for j in range(K.shape[1]):
+            K[i,j] = jaccard_similarity_score_fast(X[i], X[j])
+    return K
 
 """
 Notatki do publikacji
@@ -331,7 +341,7 @@ Notatki do publikacji
 * Najwazniejszy jest najblizszy - wazne zeby go dobrze znalezc: uczymy sie na zbiorze testujacym! KNN mocno spada z K.
 Ale nie zawsze! Sa takie ze sie liczy 3 (fingerprint = 0/0 np)
 * Stala liczba przegladnaych kandydatow na zbiorach od 1k do 4k - teoretycznie tak powinno zostac
-
+* RBF noestrem - musi miec udze C
 
 TODO:
 ok; mozna puscic melc tam i zobaczyc co sie stanie
