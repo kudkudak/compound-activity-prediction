@@ -1,7 +1,9 @@
 from misc.utils import *
 from misc.experiment_utils import get_exp_options, print_exp_header, \
     save_exp, get_exp_logger, generate_configs, print_exp_name
-from data_api import prepare_experiment_data, prepare_experiment_data_embedded, get_raw_training_data
+from data_api import prepare_experiment_data, prepare_experiment_data_embedded, get_raw_training_data, compute_jaccard_kernel
+
+
 from sklearn.metrics import matthews_corrcoef, accuracy_score, confusion_matrix
 from sklearn.svm import SVC
 from sklearn.kernel_approximation import Nystroem
@@ -44,6 +46,9 @@ def fit_svms(config_in = None):
 
     ### Prepare experiment ###
     E = {"config": config, "experiments":[]}
+	   
+    if config["kernel"] == "jaccard":
+    	K = compute_jaccard_kernel(protein=config["protein"], fingerprint=config["fingerprint"], seed=config["seed"])
 
     def fit_svm(config):
         ### Prepare result holders ###b
@@ -59,8 +64,9 @@ def fit_svms(config_in = None):
         monitors["acc_fold"] = []
         monitors["mcc_fold"] = []
         monitors["wac_fold"] = []
-	monitors["n_support"] = []
-	monitors["train_time"] = []
+        monitors["n_support"] = []
+        monitors["train_time"] = []
+        monitors["test_time"] = []
         monitors["cm"] = [] # confusion matrix
 
         results["mean_acc"] = 0
@@ -89,21 +95,34 @@ def fit_svms(config_in = None):
 
             if config["kernel"] == "rbf":
                 m = SVC(C=config["C"], gamma=config["gamma"], class_weight="auto")
-		clf = m
+                clf = m
             elif config["kernel"] == "linear":
                 m = SVC(C=config["C"], kernel="linear", class_weight="auto")
-		clf = m
+                clf = m
+            elif config["kernel"] == "jaccard":
+                m = SVC(C=config["C"], kernel="precomputed", class_weight="auto")
+                clf = m
             elif config["kernel"] == "rbf-nystroem":
                 feature_map_nystroem = Nystroem(gamma=config["gamma"], random_state=config["seed"])
-		clf = SVC(kernel="linear", C=config["C"] , class_weight="auto")
+                clf = SVC(kernel="linear", C=config["C"] , class_weight="auto")
                 m = pipeline.Pipeline([("feature_map", feature_map_nystroem),
                                                     ("svm", clf)])
-	    tstart = time.time()
-            m.fit(X_train, Y_train)
-	    monitors["train_time"].append(time.time() - tstart)
-	    monitors["n_support"].append(clf.n_support_)
+            tstart = time.time()
+            if config["kernel"] == "jaccard":
+                m.fit(K[tr_id,:][:, tr_id], Y_train)
+            else:
+                m.fit(X_train, Y_train)
 
-            Y_pred = m.predict(X_test)
+            monitors["train_time"].append(time.time() - tstart)
+            monitors["n_support"].append(clf.n_support_)
+            tstart = time.time()
+            if config["kernel"] == "jaccard":
+                Y_pred = clf.predict(K[tst_id, :][:, tr_id])
+            else:
+                Y_pred = m.predict(X_test)
+
+            monitors["test_time"].append(time.time() - tstart)
+
             acc_fold, mcc_fold = accuracy_score(Y_test, Y_pred), matthews_corrcoef(Y_test, Y_pred)
             cm = confusion_matrix(Y_test, Y_pred)
             tp, fn, fp, tn = cm[1,1], cm[1,0], cm[0,1], cm[0,0]

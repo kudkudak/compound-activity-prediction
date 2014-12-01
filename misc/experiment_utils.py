@@ -81,4 +81,4 @@ def exp_done(E):
 
 
 def save_exp(E):
-    cPickle.dump(E, open(get_exp_fname(E), "w"))
+    cPickle.dump(E, open(os.path.join(c["BASE_DIR"], get_exp_fname(E)), "w"))
