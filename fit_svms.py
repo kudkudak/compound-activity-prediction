@@ -49,7 +49,10 @@ def fit_svms(config_in = None):
 	   
     if config["kernel"] == "jaccard":
     	K = compute_jaccard_kernel(protein=config["protein"], fingerprint=config["fingerprint"], seed=config["seed"])
-
+        if K.shape[0] != X.shape[0]:
+            K = compute_jaccard_kernel(protein=config["protein"], \
+                                       fingerprint=config["fingerprint"], seed=config["seed"], force_reload=True)
+            
     def fit_svm(config):
         ### Prepare result holders ###b
         values = {}
@@ -117,7 +120,7 @@ def fit_svms(config_in = None):
             monitors["n_support"].append(clf.n_support_)
             tstart = time.time()
             if config["kernel"] == "jaccard":
-                Y_pred = clf.predict(K[tst_id, :][:, tr_id])
+                Y_pred = clf.predict(K[ts_id, :][:, tr_id])
             else:
                 Y_pred = m.predict(X_test)
 
@@ -144,7 +147,7 @@ def fit_svms(config_in = None):
 
         return E
 
-    if config["kernel"] == "linear":
+    if config["kernel"] == "linear" or config["kernel"] == "jaccard":
         cv_configs = generate_configs(config, ["C"])
     else:
         cv_configs = generate_configs(config, ["C", "gamma"])
