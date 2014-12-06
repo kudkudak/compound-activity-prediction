@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__),".."))
 
-from data_api import fingerprints, proteins
+from data_api import *
 from fit_svms import fit_svms
 
 
@@ -23,10 +23,10 @@ exps_list = list(exps())
 def run(e):
     print("Run "+str(e))
 
-    config = {"protein":e[0], "fingerprint":e[1], "use_embedding":1, "kernel":"linear", \
-              "experiment_name":"svm_linear_{0}_fin_{1}".format(*e)}
+    config = {"protein":e[0], "fingerprint":e[1], "use_embedding":1, "kernel":"linear", "max_hashes":1000, "K":30,
+              "experiment_name":"svm_linear_K_30_{0}_fin_{1}".format(*e)}
 
-    if not os.path.exists(config["experiment_name"]+".experiment"):
+    if not os.path.exists(os.path.join(c["BASE_DIR"], config["experiment_name"]+".experiment")):
         fit_svms(config)
 
 

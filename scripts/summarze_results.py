@@ -14,25 +14,26 @@ import sys
 import cPickle
 
 prefix = sys.argv[1] #For instance svm_rbf_nystr
-model = prefix
+model = sys.argv[2]
+out = sys.argv[3]
 model_name = sys.argv[2] # Usually prefix
 
 start_folder = ""
-if len(sys.argv) > 3:
-    start_folder = sys.argv[3]
+if len(sys.argv) > 4:
+    start_folder = sys.argv[4]
 
 assert(model in ["svm_jaccard","svm_rbf_nystr", "svm_rbf", "KNN", "KNN_LSH", "svm_linear"])
 
 extract_configs = {
     "svm_jaccard": ["C"],
-    "svm_rbf-nystr": ["C", "gamma"],
+    "svm_rbf_nystr": ["C", "gamma"],
     "svm_rbf":["C", "gamma"],
     "KNN":["KNN_K"],
     "KNN_LSH": [],
     "svm_linear": ["C"]
 }
 
-results_table = ["mean_acc", "mean_wac", "mean_acc"]
+results_table = ["mean_mcc", "mean_wac", "mean_acc"]
 monitors_mean = ["train_time", "test_time", "n_support"]
 # Get experiments wanted
 
@@ -45,6 +46,8 @@ for root, dirnames, filenames in os.walk(os.path.join(c["BASE_DIR"],start_folder
 import re
 if model == "KNN":
     experiments = [e for e in experiments if not re.match(".*LSH.*", e)]
+if model == "svm_rbf":
+    experiments = [e for e in experiments if not re.match(".*nystr.*", e)]
 
 print experiments
 
@@ -68,7 +71,7 @@ for e_name in experiments:
         ## Find best experiment ##
         best_e = E["experiments"][0]
         for e in E["experiments"]:
-            if e["results"]["mean_mcc"] > best_e["results"]["mean_mcc"]:
+            if e["results"]["mean_wac"] > best_e["results"]["mean_wac"]:
                 best_e = e
 
         print best_e["config"]
@@ -88,7 +91,7 @@ for prot, fin in exps():
         for r in results_table:
             row.append(experiments_grouped[(prot,fin)]["results"].get(r, np.nan))
         for m in monitors_mean:
-            row.append(experiments_grouped[(prot,fin)]["monitors"].get(m, np.array([np.nan])).mean())
+            row.append(np.array(experiments_grouped[(prot,fin)]["monitors"].get(m, [np.nan])).mean())
         results.append(row)
     else:
         results.append([proteins[prot]+":"+fingerprints[fin]] + [""] + [np.nan]*len(results_table) \
@@ -98,4 +101,4 @@ for prot, fin in exps():
 
 frame = pd.DataFrame(results, columns = ["experiment"] + ["params"] + results_table + monitors_mean)
 
-frame.to_csv(os.path.join(c["BASE_DIR"], model_name+".csv"))
+frame.to_csv(os.path.join(c["BASE_DIR"], out+".csv"))

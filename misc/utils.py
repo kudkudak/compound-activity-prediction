@@ -181,16 +181,16 @@ def generate_key(func_name, args, dict_args_original, skip_args):
 
     # Get serialized arguments (function name, or string of v if is not reference checked in ugly way
     args_serialized = \
-        '_'.join(sorted([
+        '_'.join([
             v.__name__
             if hasattr(v, '__call__')
             else
             (str(v) if len(str(v)) < 200 else hashlib.md5(str(v)).hexdigest())
-            for v in args_concat if hasattr(v, '__call__') or hasattr(v, "__init__") or str(v).find("0x") == -1]))
+            for v in args_concat if hasattr(v, '__call__') or hasattr(v, "__init__") or str(v).find("0x") == -1])
 
     logger.info("Serialized args to " + args_serialized)
 
-    key = func_name + "_" + ''.join((a for a in args_serialized if a.isalnum() or a in "!@#$%^&**_+-"))
+    key = func_name + "_" + args_serialized
 
     full_key = func_name + "(" + "".join(
         [str(k) + "=" + (str(v) if len(str(v)) < 200 else hashlib.md5(str(v)).hexdigest())

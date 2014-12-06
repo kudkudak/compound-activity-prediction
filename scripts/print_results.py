@@ -13,7 +13,7 @@ logger = get_exp_logger(E["config"])
 ## Print best mcc ##
 best_e = E["experiments"][0]
 for e in E["experiments"]:
-    if e["results"]["mean_mcc"] > best_e["results"]["mean_mcc"]:
+    if e["results"][sys.argv[2]] > best_e["results"][sys.argv[2]]:
         best_e = e
 logger.info(best_e)
 logger.info(best_e["results"]["mean_mcc"])

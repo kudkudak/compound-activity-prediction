@@ -30,7 +30,7 @@ def fit_svms(config_in = None):
                                                       max_hashes=config["max_hashes"],
                                                       protein=config["protein"], fingerprint=config["fingerprint"])
 
-    X, Y = get_raw_training_data(protein = config["protein"], fingerprint=config["fingerprint"], force_reload=True)
+    X, Y = get_raw_training_data(protein = config["protein"], fingerprint=config["fingerprint"])
 
 
     config.update(config_from_data)

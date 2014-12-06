@@ -19,7 +19,7 @@ def exps():
 
 def run(e):
     print("Run "+str(e))
-    D, config = prepare_experiment_data_embedded(protein=e[0], fingerprint=e[1], K=20, n_folds=10, seed=0, max_hashes=700)
+    D, config = prepare_experiment_data_embedded(protein=e[0], fingerprint=e[1], K=30, n_folds=10, seed=0, max_hashes=1000)
 
 
 
