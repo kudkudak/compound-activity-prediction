@@ -22,9 +22,10 @@ start_folder = ""
 if len(sys.argv) > 4:
     start_folder = sys.argv[4]
 
-assert(model in ["svm_jaccard","svm_rbf_nystr", "svm_rbf", "KNN", "KNN_LSH", "svm_linear"])
+assert(model in ["svm_jaccard","svm_rbf_nystr", "svm_rbf", "KNN", "KNN_LSH", "svm_linear", "lr"])
 
 extract_configs = {
+    "lr":["C"],
     "svm_jaccard": ["C"],
     "svm_rbf_nystr": ["C", "gamma"],
     "svm_rbf":["C", "gamma"],

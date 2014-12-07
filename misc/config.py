@@ -38,6 +38,7 @@ logger = get_logger("tfml_melc")
 # Configurations
 c = {
     # Time in seconds after which fit_svms.py learning is interrupted
+    "OPTIMIZED_MEASURE": "mean_wac",
     "EXCLUDED_PROTEINS": set(["hiv_protease", "d2"]),
     "MAX_TRAIN_TIME_SVM" : 100 ,
     "CACHE_DIR" : os.path.join(base_dir, "cache"),

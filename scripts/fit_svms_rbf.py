@@ -9,7 +9,7 @@ from data_api import fingerprints, proteins
 from fit_svms import fit_svms
 
 
-n_jobs = 10
+n_jobs = 12
 
 def exps():
     for id1, p in enumerate(proteins):

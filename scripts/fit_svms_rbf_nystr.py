@@ -25,7 +25,7 @@ def run(e):
     if proteins[e[0]] not in c["EXCLUDED_PROTEINS"]:
 	    print("Run "+str(e))
 
-	    config = {"protein":e[0], "fingerprint":e[1], "kernel":"rbf-nystroem", "C_max":5, "gamma_max":1, "gamma_min":-10,
+	    config = {"protein":e[0], "fingerprint":e[1], "kernel":"rbf-nystroem", "C_max":4, "gamma_max":1, "gamma_min":-9,
 		      "experiment_name":"svm_rbf_nystr_prot_{0}_fin_{1}".format(*e)}
 
 	    if not os.path.exists(os.path.join(c["BASE_DIR"], config["experiment_name"]+".experiment")):

@@ -331,6 +331,14 @@ def compute_jaccard_kernel(protein, fingerprint, seed):
             K[i,j] = jaccard_similarity_score_fast(X[i], X[j])
     return K
 
+
+# Create list of all experiments
+
+def exps():
+    for id1, p in enumerate(proteins):
+        for id2, f in enumerate(fingerprints):
+            yield id1, id2
+
 """
 Notatki do publikacji
 
