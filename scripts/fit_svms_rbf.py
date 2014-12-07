@@ -9,7 +9,7 @@ from data_api import fingerprints, proteins
 from fit_svms import fit_svms
 
 
-n_jobs = 4
+n_jobs = 10
 
 def exps():
     for id1, p in enumerate(proteins):
@@ -21,13 +21,14 @@ exps_list = list(exps())
 
 
 def run(e):
-    print("Run "+str(e))
+    if proteins[e[0]] not in c["EXCLUDED_PROTEINS"]:
+	    print("Run "+str(e))
 
-    config = {"protein":e[0], "fingerprint":e[1], "C_max":5,
-              "experiment_name":"svm_rbf_prot_{0}_fin_{1}".format(*e)}
+	    config = {"protein":e[0], "fingerprint":e[1], "C_max":6,
+		      "experiment_name":"svm_rbf_prot_{0}_fin_{1}".format(*e)}
 
-    if not os.path.exists(os.path.join(c["BASE_DIR"], config["experiment_name"]+".experiment")):
-        fit_svms(config)
+	    if not os.path.exists(os.path.join(c["BASE_DIR"], config["experiment_name"]+".experiment")):
+		fit_svms(config)
 
 
 print(exps_list)

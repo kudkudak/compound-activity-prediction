@@ -2,7 +2,9 @@ from misc.utils import *
 from misc.experiment_utils import get_exp_options, print_exp_header, \
     save_exp, get_exp_logger, generate_configs, print_exp_name
 from data_api import prepare_experiment_data, prepare_experiment_data_embedded, get_raw_training_data, compute_jaccard_kernel
+from misc.config import *
 
+global_config = c 
 
 from sklearn.metrics import matthews_corrcoef, accuracy_score, confusion_matrix
 from sklearn.svm import SVC
@@ -117,6 +119,13 @@ def fit_svms(config_in = None):
                 m.fit(X_train, Y_train)
 
             monitors["train_time"].append(time.time() - tstart)
+
+	    if monitors["train_time"][-1] > global_config["MAX_TRAIN_TIME_SVM"]:
+		logger.error("Exceeded train time limit "+str(global_config["MAX_TRAIN_TIME_SVM"]) + " with "+str(monitors["train_time"][-1]))
+		monitors["wac_fold"] = [0]
+		monitors["mcc_fold"] = [0]
+		monitors["acc_fold"] = [0]
+	
             monitors["n_support"].append(clf.n_support_)
             tstart = time.time()
             if config["kernel"] == "jaccard":

@@ -97,7 +97,6 @@ def set_representation_by_buckets(X):
 
 
 
-@cached_FS()
 def construct_LSH_index(protein=0, fingerprint=4, threshold=0.56, max_hashes=200):
     """
     Constructs LSH index
@@ -144,7 +143,7 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, \
     #
     # if experimental:
     #     # Try this
-    lsh_indexes = [construct_LSH_index(protein=protein, fingerprint=fingerprint, threshold=i, max_hashes=max_hashes, force_reload=True) \
+    lsh_indexes = [construct_LSH_index(protein=protein, fingerprint=fingerprint, threshold=i, max_hashes=max_hashes) \
             for i in np.linspace(0.2, 0.9, 14)]
     #
     # else:

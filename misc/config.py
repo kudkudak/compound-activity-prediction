@@ -1,5 +1,5 @@
 '''
-Basic config for whole project. Modify those variables to reflect changes
+Basic config for whole project. Modify those variables to reflect changesG
 '''
 import os
 import sys
@@ -10,7 +10,7 @@ import logging
 
 
 import os
-base_dir = "/home/moje/Projekty_big/tfml-mec"
+base_dir = "/home/moje/Projekty_big/tfml-melc"
 name = "melc"
 
 
@@ -37,6 +37,9 @@ logger = get_logger("tfml_melc")
 
 # Configurations
 c = {
+    # Time in seconds after which fit_svms.py learning is interrupted
+    "EXCLUDED_PROTEINS": set(["hiv_protease", "d2"]),
+    "MAX_TRAIN_TIME_SVM" : 100 ,
     "CACHE_DIR" : os.path.join(base_dir, "cache"),
     "DATA_DIR":os.path.join(base_dir, "data"),
     "BASE_DIR":base_dir,

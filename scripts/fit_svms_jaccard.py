@@ -10,7 +10,7 @@ from data_api import *
 from fit_svms import fit_svms
 
 
-n_jobs = 10
+n_jobs = 1
 
 def exps():
     for id1, p in enumerate(proteins):
@@ -24,7 +24,7 @@ exps_list = list(exps())
 def run(e):
     print("Run "+str(e))
 
-    config = {"protein":e[0], "fingerprint":e[1], "kernel":"jaccard", "C_max":4,
+    config = {"protein":e[0], "fingerprint":e[1], "kernel":"jaccard", "C_max":6,
               "experiment_name":"svm_jaccard_prot_{0}_fin_{1}".format(*e)}
 
     if not os.path.exists(os.path.join(c["BASE_DIR"], config["experiment_name"]+".experiment")):
