@@ -1,4 +1,4 @@
-# Code for TFML 2014 conference
+# Code for TFML 2015 conference
 
 <img src="img/mastahplot.png" width="60%"></img>
 
