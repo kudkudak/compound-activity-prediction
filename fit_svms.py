@@ -4,7 +4,7 @@ from misc.experiment_utils import get_exp_options, print_exp_header, \
 from data_api import prepare_experiment_data, prepare_experiment_data_embedded, get_raw_training_data, compute_jaccard_kernel
 from misc.config import *
 
-global_config = c 
+global_config = c
 
 from sklearn.metrics import matthews_corrcoef, accuracy_score, confusion_matrix
 from sklearn.svm import SVC
@@ -122,7 +122,7 @@ def fit_svms(config_in = None):
     #### Load config and data ####
     config = {"protein":0, "fingerprint":4,"n_folds":10, "kernel":"rbf", \
               "use_embedding": 0, "K":20, "max_hashes":1000, "seed":0, "C_min":-5, \
-              "store_clf":False,
+              "store_clf":0,
               "C_max":6, "gamma_min":-14, "gamma_max":0}
 
     if config_in is None:
@@ -156,7 +156,7 @@ def fit_svms(config_in = None):
 
     ### Prepare experiment ###
     E = {"config": config, "experiments":[]}
-	   
+
     if config["kernel"] == "jaccard":
     	K = compute_jaccard_kernel(protein=config["protein"], fingerprint=config["fingerprint"], seed=config["seed"])
         if K.shape[0] != X.shape[0]:

@@ -1,5 +1,7 @@
 # Code for TFML 2014 conference
 
+<img src="img/mastahplot.png" width="60%"></img>
+
 ## Setup
 
 Change your `misc/config.py` file to match base directory and upload to data directory all .libsvm files

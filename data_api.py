@@ -284,13 +284,6 @@ def prepare_experiment_data_embedded(protein=0, fingerprint=4, K=15, \
 
 
 
-def eval_LSH_error(D):
-    """
-    Sanity check for data. Doing the same without LSH for few points and checking if we are reasonably close
-    """
-    return 0.0
-
-
 @cached_FS()
 def prepare_experiment_data(protein=0, fingerprint=4, n_folds=10, seed=0):
     """
