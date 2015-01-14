@@ -1,4 +1,6 @@
-# Code for "Analysis of compounds activity concept learned by SVM using robust Jaccard based low-dimensional embedding" paper
+# Code for TFML 2015 paper
+
+Supporting code for *"Analysis of compounds activity concept learned by SVM using robust Jaccard based low-dimensional embedding"* paper.
 
 The paper deals with analysis of compound activity predictions. It argues that concepts learned by vastly popular SVM are degenerate
 given used sampling technique.
