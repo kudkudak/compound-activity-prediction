@@ -1,4 +1,6 @@
-# Code for TFML 2014 conference
+# Code for TFML 2015 conference paper
+
+Supporting code for "Analysis of compounds activity concept learned by SVM using robust Jaccard based low-dimensional embedding" paper
 
 <img src="img/mastahplot.png" width="60%"></img>
 
